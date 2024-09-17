@@ -10,7 +10,7 @@ app = FastAPI()
 connected_clients = {}
 
 # URL of the video processing server
-VIDEO_PROCESSING_SERVER_URL = "http://localhost:9000"
+VIDEO_PROCESSING_SERVER_URL = "http://13.234.216.197:9000"
 
 class Offer(BaseModel):
     offer: str

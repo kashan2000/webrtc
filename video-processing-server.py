@@ -223,7 +223,7 @@ async def process_candidate(request: Request):
 async def send_ice_candidate_to_signaling(candidate):
     try:
         import httpx
-        response = await httpx.post("http://localhost:8080", json={"type": "processing_candidate", "candidate": candidate.to_map()})
+        response = await httpx.post("http://13.234.216.197:8080", json={"type": "processing_candidate", "candidate": candidate.to_map()})
         print("ICE candidate sent to signaling server")
     except Exception as e:
         print(f"Error sending ICE candidate to signaling server: {e}")
