@@ -35,7 +35,7 @@ WEBRTC_CONFIG = {
 }
 
 ice_servers = [
-    RTCIceServer(urls=['stun:stun.jowisoftware.de:3478']),
+    RTCIceServer(urls=['stun:stun.l.google.com:19302']),
     # RTCIceServer(urls=['stun:stun2.l.google.com:19302']),
     # RTCIceServer(
     #     urls=['turn:192.158.29.39:3478?transport=udp'],
