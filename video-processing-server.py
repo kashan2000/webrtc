@@ -8,7 +8,6 @@ from fastapi.responses import JSONResponse
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 import os
 import cv2
-from PIL import Image
 import numpy as np
 
 app = FastAPI()
@@ -17,24 +16,6 @@ app = FastAPI()
 peer_connections = {}
 
 # WebRTC configuration (STUN servers can be added if needed)
-WEBRTC_CONFIG = {
-    'iceServers': [
-        {
-            'url': 'stun:stun.l.google.com:19302'
-        },
-        {
-            'url': 'turn:192.158.29.39:3478?transport=udp',
-            'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-            'username': '28224511:1379330808'
-        },
-        {
-            'url': 'turn:192.158.29.39:3478?transport=tcp',
-            'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-            'username': '28224511:1379330808'
-        }
-    ]
-}
-
 ice_servers = [
     RTCIceServer(urls=['stun:stun.l.google.com:19302']),
     # Additional ICE servers can be added here
@@ -48,19 +29,22 @@ fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for mp4
 out = cv2.VideoWriter(output_video, fourcc, fps, output_resolution)
 
 async def process_frame(frame, frame_count):
-    # Convert the frame to an RGB image using numpy
-    img = frame.to_ndarray(format="rgb24")  # Convert the frame to a numpy array
-    
-    # Resize the image to match the output resolution if necessary
-    if img.shape[:2] != output_resolution:
-        img = cv2.resize(img, output_resolution)
-    
-    # Write the frame to the video file
-    out.write(img)
-    print(f"Frame {frame_count} saved")
+    try:
+        # Convert the frame to an RGB image using numpy
+        img = frame.to_ndarray(format="rgb24")  # Convert the frame to a numpy array
+        
+        # Resize the image to match the output resolution if necessary
+        if img.shape[:2] != output_resolution:
+            img = cv2.resize(img, output_resolution)
+        
+        # Write the frame to the video file
+        out.write(img)
+        print(f"Frame {frame_count} saved")
 
-    # Add actual video processing logic here (for object detection or pose estimation)
-    return {"object_detected": "person", "pose": "running"}
+        # Add actual video processing logic here (for object detection or pose estimation)
+        return {"object_detected": "person", "pose": "running"}
+    except Exception as e:
+        print(f"Error processing frame {frame_count}: {e}")
 
 @app.post("/process_offer")
 async def process_offer(request: Request):
@@ -84,8 +68,7 @@ async def process_offer(request: Request):
                     try:
                         frame = await track.recv()
                         frame_count += 1
-                        processed_data = await process_frame(frame, frame_count)
-                        print(f"Processed data: {processed_data}")
+                        await process_frame(frame, frame_count)
                     except Exception as e:
                         print(f"Error receiving video frame: {e}")
                         break
