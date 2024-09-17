@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack
 import os
+import cv2
 from PIL import Image
 import numpy as np
 
@@ -18,48 +19,45 @@ peer_connections = {}
 # WebRTC configuration (STUN servers can be added if needed)
 WEBRTC_CONFIG = {
     'iceServers': [
-    {
-      'url': 'stun:stun.l.google.com:19302'
-    },
-    {
-      'url': 'turn:192.158.29.39:3478?transport=udp',
-      'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-      'username': '28224511:1379330808'
-    },
-    {
-      'url': 'turn:192.158.29.39:3478?transport=tcp',
-      'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-      'username': '28224511:1379330808'
-    }
-  ]
+        {
+            'url': 'stun:stun.l.google.com:19302'
+        },
+        {
+            'url': 'turn:192.158.29.39:3478?transport=udp',
+            'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+            'username': '28224511:1379330808'
+        },
+        {
+            'url': 'turn:192.158.29.39:3478?transport=tcp',
+            'credential': 'JZEOEt2V3Qb0y27GRntt2u2PAYA=',
+            'username': '28224511:1379330808'
+        }
+    ]
 }
 
 ice_servers = [
     RTCIceServer(urls=['stun:stun.l.google.com:19302']),
-    # RTCIceServer(urls=['stun:stun2.l.google.com:19302']),
-    # RTCIceServer(
-    #     urls=['turn:192.158.29.39:3478?transport=udp'],
-    #     credential='JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-    #     username='28224511:1379330808'
-    # ),
-    # RTCIceServer(
-    #     urls=['turn:192.158.29.39:3478?transport=tcp'],
-    #     credential='JZEOEt2V3Qb0y27GRntt2u2PAYA=',
-    #     username='28224511:1379330808'
-    # )
+    # Additional ICE servers can be added here
 ]
 
-# Dummy video processing (converting frame to grayscale)
+# Initialize the video writer
+output_video = 'output_video.mp4'
+fps = 30  # Adjust as needed
+output_resolution = (640, 360)  # Set your desired resolution
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for mp4
+out = cv2.VideoWriter(output_video, fourcc, fps, output_resolution)
+
 async def process_frame(frame, frame_count):
     # Convert the frame to an RGB image using numpy
     img = frame.to_ndarray(format="rgb24")  # Convert the frame to a numpy array
     
-    # Convert the numpy array to an image
-    image = Image.fromarray(img)
+    # Resize the image to match the output resolution if necessary
+    if img.shape[:2] != output_resolution:
+        img = cv2.resize(img, output_resolution)
     
-    # Save the image as PNG in the "video" folder with a unique name
-    image.save(f"video/frame_{frame_count:05d}.png")
-    print("iamge saved")
+    # Write the frame to the video file
+    out.write(img)
+    print(f"Frame {frame_count} saved")
 
     # Add actual video processing logic here (for object detection or pose estimation)
     return {"object_detected": "person", "pose": "running"}
@@ -77,7 +75,6 @@ async def process_offer(request: Request):
         rtc_config = RTCConfiguration(iceServers=ice_servers)
         pc = RTCPeerConnection(configuration=rtc_config)
         peer_connections[pc] = pc
-        # print(f"peer connection {peer_connections}")
         
         async def on_track(track):
             frame_count = 0
@@ -87,7 +84,7 @@ async def process_offer(request: Request):
                     try:
                         frame = await track.recv()
                         frame_count += 1
-                        processed_data = await process_frame(frame,frame_count)
+                        processed_data = await process_frame(frame, frame_count)
                         print(f"Processed data: {processed_data}")
                     except Exception as e:
                         print(f"Error receiving video frame: {e}")
@@ -96,7 +93,6 @@ async def process_offer(request: Request):
         @pc.on("track")
         def on_track_event(track):
             asyncio.ensure_future(on_track(track))
-
 
         offer_desc = RTCSessionDescription(sdp=offer_sdp, type="offer")
         await pc.setRemoteDescription(offer_desc)
@@ -109,25 +105,12 @@ async def process_offer(request: Request):
             print(f"ICE gathering state changed: {pc.iceGatheringState}")
 
         @pc.on("iceconnectionstatechange")
-        def on_ice_gathering_state_change():
-            print(f"ICE connection state changed: {pc.iceConnectionState}")  
+        def on_ice_connection_state_change():
+            print(f"ICE connection state changed: {pc.iceConnectionState}")
 
         @pc.on("connectionstatechange")
-        def on_ice_gathering_state_change():
-            print(f"PC connection state changed: {pc.connectionState}")        
-
-        # print(f"offer sdk {offer_sdp}")
-        # print(f"answer sdk {pc.localDescription}")
-
-        # @pc.on("icecandidate")
-        # async def on_ice_candidate_event(candidate):
-        #     print("ice candidate received")
-        #     if candidate:
-        #         print("ICE candidate received:", candidate)
-        #         await send_ice_candidate_to_signaling(candidate)
-        #     else:
-        #         print("ICE gathering completed (no more candidates).")
-
+        def on_connection_state_change():
+            print(f"PC connection state changed: {pc.connectionState}")
 
         return JSONResponse(content={"sdp": pc.localDescription.sdp})
 
@@ -136,8 +119,6 @@ async def process_offer(request: Request):
         print("Stack trace:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-
 
 def parse_ice_candidate(candidate_str, sdp_mid, sdp_mline_index):
     pattern = r"candidate:(\d+) (\d+) (\w+) (\d+) ([\da-fA-F\:\.]+) (\d+) typ (\w+)(?: raddr ([\da-fA-F\:\.]+) rport (\d+))?"
@@ -169,7 +150,6 @@ def parse_ice_candidate(candidate_str, sdp_mid, sdp_mline_index):
         }
     else:
         raise ValueError("Invalid ICE candidate string format")
-
 
 @app.post("/process_candidate")
 async def process_candidate(request: Request):
@@ -208,7 +188,6 @@ async def process_candidate(request: Request):
 
         # Get the first peer connection (for simplicity)
         pc = next(iter(peer_connections.values()))
-        # print(f"peer connection here {pc}")
         await pc.addIceCandidate(candidate)
 
         return JSONResponse(content={"status": "candidate processed"})
@@ -218,7 +197,6 @@ async def process_candidate(request: Request):
         print("Stack trace:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
 
 async def send_ice_candidate_to_signaling(candidate):
     try:
@@ -230,6 +208,10 @@ async def send_ice_candidate_to_signaling(candidate):
         print("Stack trace:")
         traceback.print_exc()
 
+@app.on_event("shutdown")
+async def shutdown_event():
+    # Release the video writer when shutting down
+    out.release()
 
 if __name__ == "__main__":
     import uvicorn
