@@ -2,11 +2,11 @@ import cv2
 import os
 
 # Directory containing images
-image_folder = 'C:/Users/khank/OneDrive/Desktop'  # Replace with the path to your images
+image_folder = 'C:/Users/khank/OneDrive/Desktop/Desktop'  # Replace with the path to your images
 # Output video file name
 output_video = 'C:/Users/khank/OneDrive/Desktop/output_video.mp4'
 # Desired video resolution (width, height)
-output_resolution = (640, 360)  # Example resolution
+output_resolution = (640, 480)  # Example resolution
 
 # Function to resize an image while maintaining aspect ratio
 def resize_image(image, target_resolution):
@@ -41,7 +41,7 @@ images.sort()  # Sort the images by name, modify as needed
 
 # Initialize video writer
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for mp4
-fps = 10  # Frames per second
+fps = 20  # Frames per second
 out = cv2.VideoWriter(output_video, fourcc, fps, output_resolution)
 
 # Process each image

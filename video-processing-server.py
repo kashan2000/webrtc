@@ -83,6 +83,7 @@ async def process_offer(request: Request):
             frame_count = 0
             if track.kind == "video":
                 print("Video track received, starting to process video frames")
+                
                 while True:
                     try:
                         frame = await track.recv()
